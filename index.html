@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>りかいクイズ</title>
+<style>
+  :root {
+    --bg: #fff8f3;
+    --card: #ffffff;
+    --text: #2b2b2b;
+    --sub: #777;
+    --accent: #ff7a59;
+    --accent-weak: #ffe3d9;
+    --ok: #2e9e6a;
+    --ng: #d9534f;
+    --border: #eee2da;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+    line-height: 1.6;
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  .logo { color: var(--accent); font-weight: 700; font-size: .9rem; }
+  .sub { color: var(--sub); font-size: .9rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 16px;
+  }
+  input[type=text] {
+    width: 100%;
+    font-size: 1rem;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 8px 0 16px;
+  }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 16px;
+    width: 100%;
+  }
+  .primary { background: var(--accent); color: #fff; font-weight: 700; }
+  .primary:disabled { opacity: .4; cursor: default; }
+  .ghost { background: transparent; color: var(--sub); padding: 8px; width: auto; }
+  .choice {
+    display: block;
+    background: var(--accent-weak);
+    color: var(--text);
+    text-align: left;
+    margin-top: 10px;
+  }
+  .choice:hover { outline: 2px solid var(--accent); }
+  .choice b { color: var(--accent); margin-right: 8px; }
+  .progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress > div { height: 100%; background: var(--accent); transition: width .2s; }
+  .qnum { color: var(--sub); font-size: .85rem; margin-top: 12px; }
+  .qtext { font-size: 1.15rem; font-weight: 700; margin: 4px 0 8px; }
+  .score { font-size: 2.6rem; font-weight: 800; color: var(--accent); text-align: center; }
+  .comment { text-align: center; font-weight: 700; }
+  .share { word-break: break-all; font-size: .8rem; background: var(--bg); padding: 10px; border-radius: 8px; }
+  .review { list-style: none; padding: 0; margin: 0; }
+  .review li { border-top: 1px solid var(--border); padding: 10px 0; font-size: .9rem; }
+  .review .mark { font-weight: 700; margin-right: 6px; }
+  .review .ok { color: var(--ok); }
+  .review .ng { color: var(--ng); }
+  .rank { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  .rank td { padding: 8px 4px; border-top: 1px solid var(--border); }
+  .rank td:last-child { text-align: right; font-weight: 700; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row button { flex: 1; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+
+<script>
+// 質問データ:ここを書き換えれば質問を変えられる
+// a: 選択肢(3つ) / src: 元ネタの投稿(画面には出さない)
+const QUESTIONS = [
+  { q: "1億円もらえるが、一生「好きな食べ方」を1つ禁止される。どうする？", a: ["迷わず受け取る", "禁止される内容しだい", "好きなものは譲れないので断る"], src: "https://x.com/4309qwerty/status/2104822498147876894" },
+  { q: "恋愛では？", a: ["追いかけたい", "追われたい", "対等がいい"], src: "https://x.com/fumiya0307/status/2036068688068317201" },
+  { q: "身内でデスゲームが始まったら、自分はどうなる？", a: ["最後まで生き残る", "序盤で脱落する", "警戒されて最初に狙われる"], src: "https://x.com/yuukamiya68/status/1059270960241500160" },
+  { q: "恋人との理想の連絡頻度は？", a: ["毎日おはよう・おやすみ", "数日に1回くらい", "用事があるときだけ"], src: "https://x.com/kadena_love0/status/1976047560990347367" },
+  { q: "友だちが作ったものを見せられた。正直いいと思えなかったら？", a: ["正直に感想を言う", "とりあえず褒める", "良いところだけ探して伝える"], src: "https://x.com/Rower1216/status/2101507160245199096" },
+  { q: "どこからが浮気？", a: ["二人きりで食事に行ったら", "気持ちが傾いた時点で", "体の関係を持ったら"], src: "https://x.com/Happy_Pokonyan1/status/1981846592635503075" },
+  { q: "「明日、私がコップ一杯の水になったら、その水をどうする？」と言われたら？", a: ["飲む", "ずっと飾っておく", "花にあげる"], src: "https://x.com/hukaiyoitaiyo/status/1542460319968407558" },
+  { q: "男女の友情は成立する？", a: ["成立する", "場合による", "成立しない"], src: "https://x.com/piyo_hiyokoman/status/1571712684416176129" },
+  { q: "「5年後どうなっていたい？」と聞かれたら？", a: ["具体的な目標を答えられる", "ぼんやりとならある", "今で精一杯で考えていない"], src: "https://x.com/Shioko5/status/1780013438007435572" },
+  { q: "夕方に送ったLINEの返信が翌日だったら？", a: ["全然気にしない", "少しモヤっとする", "かなり無理"], src: "https://x.com/___tou_latte_/status/2096803000564215955" },
+  { q: "恋人に「なんで怒ってるかわかる？」と言われたら？", a: ["正直に「教えて」と聞く", "思い当たることを謝る", "落ち着くまで待つ"], src: "https://x.com/Motosuzukisan/status/964484802039574528" },
+  { q: "恋人がいても、1人の時間はどれくらい必要？", a: ["ほとんどいらない", "週に何日かは欲しい", "毎日必ず欲しい"], src: "https://x.com/wlbisimportant/status/2045744404833718498" },
+  { q: "恋人と価値観が違ったときは？", a: ["納得するまで話し合う", "相手の考えを受け入れる", "深入りせずそっとしておく"], src: "https://x.com/radran10/status/2103108125624840289" },
+  { q: "失恋した異性の親友に「今日だけ泊めて」と頼まれたら？", a: ["泊める", "話は聞くけど泊めない", "断る"], src: "https://x.com/Ringoxlove/status/2111668157652046069" },
+  { q: "恋人と会う理想の頻度は？", a: ["週2回以上", "週1回くらい", "月に数回でも平気"], src: "https://x.com/wlbisimportant/status/2045744404833718498" },
+  { q: "倦怠期で、好きかわからなくなったら？", a: ["乗り越える努力をする", "少し距離を置いて様子を見る", "気持ちに正直に別れる"], src: "https://x.com/___tou_latte_/status/2112744956318401007" },
+  { q: "恋人の過去の恋愛について知りたい？", a: ["全部知りたい", "別れた理由だけ知りたい", "知りたくない"], src: "https://x.com/wlbisimportant/status/2045744404833718498" },
+  { q: "理想の出会い方は？", a: ["自然に出会って少しずつ", "友だちの紹介", "マッチングアプリでも全然いい"], src: "https://x.com/yagi_mt/status/1793326596981772601" },
+  { q: "記念日はどう過ごしたい？", a: ["しっかりお祝いしたい", "ささやかでいい", "特に気にしない"], src: "https://x.com/kadena_love0/status/1976047560990347367" },
+  { q: "恋人があまり連絡をくれないタイプだったら？", a: ["愛情が足りないと感じる", "そういう性格だと割り切る", "むしろ楽"], src: "https://x.com/Tatarianaster_7/status/2012484681560916104" },
+];
+
+const LABELS = ["A", "B", "C"];
+const app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// 共有URLのハッシュ:#n=名前&a=回答(0〜2の数字20桁)
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const n = p.get("n"), a = p.get("a");
+  if (!n || !a || a.length !== QUESTIONS.length || /[^0-2]/.test(a)) return null;
+  return { name: n, answers: a.split("").map(Number) };
+}
+function shareUrl(name, answers) {
+  const base = location.href.split("#")[0];
+  return base + "#" + new URLSearchParams({ n: name, a: answers.join("") }).toString();
+}
+
+// ランキングはこのブラウザ内だけに保存(手元版)
+function rankKey(quiz) { return "rikai-rank:" + quiz.name + ":" + quiz.answers.join(""); }
+function loadRank(quiz) {
+  try { return JSON.parse(localStorage.getItem(rankKey(quiz))) || []; } catch { return []; }
+}
+function saveRank(quiz, entry) {
+  const list = loadRank(quiz).concat(entry).sort((x, y) => y.score - x.score);
+  try { localStorage.setItem(rankKey(quiz), JSON.stringify(list)); } catch {}
+  return list;
+}
+
+function commentFor(score) {
+  const r = score / QUESTIONS.length;
+  if (r === 1) return "全問正解。もはや本人より詳しいかも";
+  if (r >= 0.75) return "かなり理解してる。いい関係です";
+  if (r >= 0.5) return "半分はわかってる。もっと話すと見えてきそう";
+  return "まだ知らない一面がたくさんありそう";
+}
+
+// 質問に1問ずつ答える画面(作成者・挑戦者で共通)
+function runQuiz(heading, onDone) {
+  const picks = [];
+  const render = () => {
+    const i = picks.length;
+    if (i === QUESTIONS.length) return onDone(picks);
+    const item = QUESTIONS[i];
+    app.innerHTML = `
+      <div class="logo">りかいクイズ</div>
+      <div class="sub">${esc(heading)}</div>
+      <div class="progress"><div style="width:${(i / QUESTIONS.length) * 100}%"></div></div>
+      <div class="card">
+        <div class="qnum">Q${i + 1} / ${QUESTIONS.length}</div>
+        <div class="qtext">${esc(item.q)}</div>
+        ${item.a.map((t, k) => `<button class="choice" data-k="${k}"><b>${LABELS[k]}</b>${esc(t)}</button>`).join("")}
+      </div>
+      ${i > 0 ? `<button class="ghost" id="back">← ひとつ戻る</button>` : ""}`;
+    app.querySelectorAll(".choice").forEach(b => b.onclick = () => { picks.push(Number(b.dataset.k)); render(); });
+    const back = document.getElementById("back");
+    if (back) back.onclick = () => { picks.pop(); render(); };
+  };
+  render();
+}
+
+function nameForm({ title, lead, button, onSubmit }) {
+  app.innerHTML = `
+    <div class="logo">りかいクイズ</div>
+    <h1>${esc(title)}</h1>
+    <div class="sub">${esc(lead)}</div>
+    <div class="card">
+      <label for="name">あなたの名前</label>
+      <input type="text" id="name" maxlength="20" placeholder="例:ひろと">
+      <button class="primary" id="go" disabled>${esc(button)}</button>
+    </div>`;
+  const input = document.getElementById("name"), go = document.getElementById("go");
+  input.oninput = () => go.disabled = !input.value.trim();
+  go.onclick = () => onSubmit(input.value.trim());
+}
+
+// 作成者モード
+function creatorStart() {
+  nameForm({
+    title: "あなたのこと、どれくらい理解されてる？",
+    lead: `全${QUESTIONS.length}問・3択。まず自分の答えを選んで、友だちに当ててもらおう。`,
+    button: "自分の答えを選ぶ",
+    onSubmit: name => runQuiz(`${name}さんの答えを選んでください`, answers => creatorDone(name, answers)),
+  });
+}
+
+function creatorDone(name, answers) {
+  const url = shareUrl(name, answers);
+  app.innerHTML = `
+    <div class="logo">りかいクイズ</div>
+    <h1>準備できました</h1>
+    <div class="sub">このURLを友だちに送ると、「${esc(name)}の答え、いくつ当てられる？」に挑戦できます。</div>
+    <div class="card">
+      <div class="share" id="url">${esc(url)}</div>
+      <div class="row">
+        <button class="primary" id="copy">URLをコピー</button>
+        ${navigator.share ? `<button class="primary" id="send">送る</button>` : ""}
+      </div>
+      <div class="sub" id="copied"></div>
+    </div>
+    <div class="row"><button class="ghost" id="try">自分で開いて試す</button></div>`;
+  document.getElementById("copy").onclick = async () => {
+    const msg = document.getElementById("copied");
+    try { await navigator.clipboard.writeText(url); msg.textContent = "コピーしました"; }
+    catch { msg.textContent = "コピーできませんでした。上のURLを長押しして選択してください"; }
+  };
+  const send = document.getElementById("send");
+  if (send) send.onclick = () => navigator.share({ title: "りかいクイズ", text: `「${name}」の答え、いくつ当てられる？`, url }).catch(() => {});
+  document.getElementById("try").onclick = () => { location.hash = url.split("#")[1]; };
+}
+
+// 挑戦者モード
+function challengerStart(quiz) {
+  nameForm({
+    title: `「${quiz.name}」の答え、いくつ当てられる？`,
+    lead: `全${QUESTIONS.length}問・3択。${quiz.name}ならどれを選ぶか、当ててください。`,
+    button: "挑戦する",
+    onSubmit: name => runQuiz(`${quiz.name}ならどれを選ぶ？`, picks => challengerResult(quiz, name, picks)),
+  });
+}
+
+function challengerResult(quiz, name, picks) {
+  const score = picks.filter((p, i) => p === quiz.answers[i]).length;
+  const ranking = saveRank(quiz, { name, score, at: Date.now() });
+  app.innerHTML = `
+    <div class="logo">りかいクイズ</div>
+    <h1>${esc(name)}さんの結果</h1>
+    <div class="card">
+      <div class="score">${score} / ${QUESTIONS.length}</div>
+      <div class="comment">${esc(commentFor(score))}</div>
+    </div>
+    <div class="card">
+      <b>ランキング</b>
+      <table class="rank">
+        ${ranking.slice(0, 10).map((r, i) => `<tr><td>${i + 1}位</td><td>${esc(r.name)}</td><td>${r.score}</td></tr>`).join("")}
+      </table>
+      <div class="sub">※ このブラウザで挑戦した人だけが表示されます</div>
+    </div>
+    <div class="card">
+      <b>答え合わせ</b>
+      <ul class="review">
+        ${QUESTIONS.map((item, i) => {
+          const hit = picks[i] === quiz.answers[i];
+          return `<li><span class="mark ${hit ? "ok" : "ng"}">${hit ? "○" : "×"}</span>Q${i + 1}. ${esc(item.q)}<br>
+            <span class="sub">${esc(quiz.name)}:${esc(item.a[quiz.answers[i]])}${hit ? "" : ` / あなた:${esc(item.a[picks[i]])}`}</span></li>`;
+        }).join("")}
+      </ul>
+    </div>
+    <div class="row">
+      <button class="primary" id="again">もう一度挑戦</button>
+      <button class="primary" id="mine">自分のクイズを作る</button>
+    </div>`;
+  document.getElementById("again").onclick = () => challengerStart(quiz);
+  document.getElementById("mine").onclick = () => { history.pushState(null, "", location.pathname); route(); };
+  window.scrollTo(0, 0);
+}
+
+function route() {
+  const quiz = readHash();
+  quiz ? challengerStart(quiz) : creatorStart();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
